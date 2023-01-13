@@ -2431,8 +2431,51 @@ const char * SDL_AndroidGetExternalStoragePath(void)
 
         /* fileObj = context.getExternalFilesDir(); */
         mid = (*env)->GetMethodID(env, (*env)->GetObjectClass(env, context),
-                "getExternalFilesDir", "(Ljava/lang/String;)Ljava/io/File;");
+                                  "getExternalFilesDir", "(Ljava/lang/String;)Ljava/io/File;");
         fileObject = (*env)->CallObjectMethod(env, context, mid, NULL);
+        if (!fileObject) {
+            SDL_SetError("Couldn't get external directory");
+            LocalReferenceHolder_Cleanup(&refs);
+            return NULL;
+        }
+
+        /* path = fileObject.getAbsolutePath(); */
+        mid = (*env)->GetMethodID(env, (*env)->GetObjectClass(env, fileObject),
+                                  "getAbsolutePath", "()Ljava/lang/String;");
+        pathString = (jstring)(*env)->CallObjectMethod(env, fileObject, mid);
+
+        path = (*env)->GetStringUTFChars(env, pathString, NULL);
+        s_AndroidExternalFilesPath = SDL_strdup(path);
+        (*env)->ReleaseStringUTFChars(env, pathString, path);
+
+        LocalReferenceHolder_Cleanup(&refs);
+    }
+    return s_AndroidExternalFilesPath;
+}
+
+const char * SDL_AndroidGetTopExternalStoragePath(void)
+{
+    static char *s_AndroidExternalFilesPath = NULL;
+
+    if (!s_AndroidExternalFilesPath) {
+        struct LocalReferenceHolder refs = LocalReferenceHolder_Setup(__FUNCTION__);
+        jclass cls;
+        jmethodID mid;
+        jobject fileObject;
+        jstring pathString;
+        const char *path;
+
+        JNIEnv *env = Android_JNI_GetEnv();
+        if (!LocalReferenceHolder_Init(&refs, env)) {
+            LocalReferenceHolder_Cleanup(&refs);
+            return NULL;
+        }
+
+        /* fileObj = context.getExternalStorageDirectory(); */
+        cls = (*env)->FindClass(env, "android/os/Environment");
+        mid = (*env)->GetStaticMethodID(env, cls,
+                "getExternalStorageDirectory", "()Ljava/io/File;");
+        fileObject = (*env)->CallStaticObjectMethod(env, cls, mid);
         if (!fileObject) {
             SDL_SetError("Couldn't get external directory");
             LocalReferenceHolder_Cleanup(&refs);
