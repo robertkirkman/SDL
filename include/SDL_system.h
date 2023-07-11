@@ -416,6 +416,31 @@ extern DECLSPEC int SDLCALL SDL_AndroidGetExternalStorageState(void);
 extern DECLSPEC const char * SDLCALL SDL_AndroidGetExternalStoragePath(void);
 
 /**
+ * Get the path used for external storage for this application.
+ *
+ * This path is unique to your application, but is public and can be written
+ * to by other applications.
+ *
+ * Your external storage path is typically:
+ * `/storage/sdcard0/Android/data/your.app.package/files`.
+ *
+ * \returns the path used for external storage for this application on success
+ *          or NULL on failure; call SDL_GetError() for more information.
+ *
+ * \since This function is available since SDL 2.0.0.
+ *
+ * \sa SDL_AndroidGetExternalStorageState
+ */
+extern DECLSPEC const char * SDLCALL SDL_AndroidGetTopExternalStoragePath(void);
+
+/**
+ * Recursively copy all asset files and folders to the given directory
+ *
+ * \param destpath The target directory to which to copy all assets.
+ */
+extern DECLSPEC void SDLCALL SDL_AndroidCopyAssetFilesToDir(const char *destpath);
+
+/**
  * Request permissions at runtime.
  *
  * This blocks the calling thread until the permission is granted or denied.

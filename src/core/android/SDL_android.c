@@ -324,6 +324,7 @@ static jmethodID midManualBackButton;
 static jmethodID midMinimizeWindow;
 static jmethodID midOpenURL;
 static jmethodID midRequestPermission;
+static jmethodID midCopyAssetFilesToDir;
 static jmethodID midShowToast;
 static jmethodID midSendMessage;
 static jmethodID midSetActivityTitle;
@@ -612,6 +613,7 @@ JNIEXPORT void JNICALL SDL_JAVA_INTERFACE(nativeSetupJNI)(JNIEnv *env, jclass cl
     midMinimizeWindow = (*env)->GetStaticMethodID(env, mActivityClass, "minimizeWindow", "()V");
     midOpenURL = (*env)->GetStaticMethodID(env, mActivityClass, "openURL", "(Ljava/lang/String;)I");
     midRequestPermission = (*env)->GetStaticMethodID(env, mActivityClass, "requestPermission", "(Ljava/lang/String;I)V");
+    midCopyAssetFilesToDir = (*env)->GetStaticMethodID(env, mActivityClass, "copyAssetFilesToDir", "(Ljava/lang/String;)V");
     midShowToast = (*env)->GetStaticMethodID(env, mActivityClass, "showToast", "(Ljava/lang/String;IIII)I");
     midSendMessage = (*env)->GetStaticMethodID(env, mActivityClass, "sendMessage", "(II)Z");
     midSetActivityTitle = (*env)->GetStaticMethodID(env, mActivityClass, "setActivityTitle", "(Ljava/lang/String;)Z");
@@ -2531,9 +2533,67 @@ const char *SDL_AndroidGetExternalStoragePath(void)
     return s_AndroidExternalFilesPath;
 }
 
+const char * SDL_AndroidGetTopExternalStoragePath(void)
+{
+    static char *s_AndroidExternalFilesPath = NULL;
+
+    if (!s_AndroidExternalFilesPath) {
+        struct LocalReferenceHolder refs = LocalReferenceHolder_Setup(__FUNCTION__);
+        jclass cls;
+        jmethodID mid;
+        jobject fileObject;
+        jstring pathString;
+        const char *path;
+
+        JNIEnv *env = Android_JNI_GetEnv();
+        if (!LocalReferenceHolder_Init(&refs, env)) {
+            LocalReferenceHolder_Cleanup(&refs);
+            return NULL;
+        }
+
+        /* fileObj = context.getExternalStorageDirectory(); */
+        cls = (*env)->FindClass(env, "android/os/Environment");
+        mid = (*env)->GetStaticMethodID(env, cls,
+                "getExternalStorageDirectory", "()Ljava/io/File;");
+        fileObject = (*env)->CallStaticObjectMethod(env, cls, mid);
+        if (!fileObject) {
+            SDL_SetError("Couldn't get external directory");
+            LocalReferenceHolder_Cleanup(&refs);
+            return NULL;
+        }
+
+        /* path = fileObject.getAbsolutePath(); */
+        mid = (*env)->GetMethodID(env, (*env)->GetObjectClass(env, fileObject),
+                "getAbsolutePath", "()Ljava/lang/String;");
+        pathString = (jstring)(*env)->CallObjectMethod(env, fileObject, mid);
+
+        path = (*env)->GetStringUTFChars(env, pathString, NULL);
+        s_AndroidExternalFilesPath = SDL_strdup(path);
+        (*env)->ReleaseStringUTFChars(env, pathString, path);
+
+        LocalReferenceHolder_Cleanup(&refs);
+    }
+    return s_AndroidExternalFilesPath;
+}
+
 SDL_bool SDL_AndroidRequestPermission(const char *permission)
 {
     return Android_JNI_RequestPermission(permission);
+}
+
+void SDL_AndroidCopyAssetFilesToDir(const char* destpath)
+{
+    Android_JNI_CopyAssetFilesToDir(destpath);
+}
+
+void Android_JNI_CopyAssetFilesToDir(const char *destpath)
+{
+    JNIEnv *env = Android_JNI_GetEnv();
+    jstring jdestpath;
+
+    jdestpath = (*env)->NewStringUTF(env, destpath);
+    (*env)->CallStaticVoidMethod(env, mActivityClass, midCopyAssetFilesToDir, jdestpath);
+    (*env)->DeleteLocalRef(env, jdestpath);
 }
 
 int SDL_AndroidShowToast(const char *message, int duration, int gravity, int xOffset, int yOffset)
